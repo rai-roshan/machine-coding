@@ -1,47 +1,88 @@
 package user_documents_manager
 
 import (
-	"document_service/domain/document"
+	// "document_service/domain/document"
+	// "document_service/domain/document_access_manager"
+	"document_service/domain/user_document_mapping"
 )
 
 type UserDocumentsManger struct {
-	userOwnedDocuments map[uint32][]*document.Document
+	documentIdToUsers map[uint32]map[uint32]*user_document_mapping.UserDocumentMapping
+	userIdToDocuments map[uint32]map[uint32]*user_document_mapping.UserDocumentMapping
 }
 
 func NewUserDocumentManager() *UserDocumentsManger {
 	return &UserDocumentsManger{
-		userOwnedDocuments: make(map[uint32][]*document.Document),
+		documentIdToUsers: make(map[uint32]map[uint32]*user_document_mapping.UserDocumentMapping),
+		userIdToDocuments: make(map[uint32]map[uint32]*user_document_mapping.UserDocumentMapping),
 	}
 }
 
-func (udm *UserDocumentsManger) GetUserDocuments( userId uint32) []*document.Document {
-	return udm.userOwnedDocuments[userId]
-}
+func (udm *UserDocumentsManger) AddUserDocument(userId uint32, userDocMapp *user_document_mapping.UserDocumentMapping) error {
 
-func (udm *UserDocumentsManger) AddUserDocument( userId uint32 , document *document.Document ) error {
-	// TODO : manage duplicates
-	udm.userOwnedDocuments[userId] = append(udm.userOwnedDocuments[userId], document)
-	return nil 
-}
-
-func (udm *UserDocumentsManger) RemoveUserDocument(userId uint32, docId uint32) error {
-	userDocuments := udm.userOwnedDocuments[userId]
-	var newUserDocuments []*document.Document
-	for _, doc := range userDocuments {
-		if doc.GetDocumentId() != docId {
-			newUserDocuments = append(newUserDocuments, doc)
-		} 
+	_, ok := udm.documentIdToUsers[userDocMapp.GetDocumentId()]
+	if !ok {
+		udm.documentIdToUsers[userDocMapp.GetDocumentId()] = make(map[uint32]*user_document_mapping.UserDocumentMapping)
+		udm.documentIdToUsers[userDocMapp.GetDocumentId()][userDocMapp.GetUserId()] = userDocMapp
+	} else {
+		udm.documentIdToUsers[userDocMapp.GetDocumentId()][userDocMapp.GetUserId()] = userDocMapp
 	}
-	udm.userOwnedDocuments[userId] = newUserDocuments
+
+	_, ok = udm.userIdToDocuments[userDocMapp.GetUserId()]
+	if !ok {
+		udm.userIdToDocuments[userDocMapp.GetUserId()] = make(map[uint32]*user_document_mapping.UserDocumentMapping)
+		udm.userIdToDocuments[userDocMapp.GetUserId()][userDocMapp.GetDocumentId()] = userDocMapp
+	} else {
+		udm.userIdToDocuments[userDocMapp.GetUserId()][userDocMapp.GetDocumentId()] = userDocMapp
+	}
+
 	return nil
 }
 
-func (udm *UserDocumentsManger) CheckUserOwnTheDocument( userId uint32, documentId uint32 ) bool {
-	documents := udm.userOwnedDocuments[userId]
-	for _, doc := range documents {
-		if doc.GetDocumentId() == documentId {
-			return true
-		}
+func (udm *UserDocumentsManger) RemoveUserDocument(userId uint32, docId uint32) error {
+
+	delete(udm.documentIdToUsers, docId)
+	delete(udm.userIdToDocuments, userId)
+
+	return nil
+}
+
+func (udm *UserDocumentsManger) CheckUserOwnTheDocument(userId uint32, documentId uint32) bool {
+	docIdToUserDocMapp, ok := udm.userIdToDocuments[userId]
+	if !ok {
+		return false
 	}
-	return false
+	userDocMapp, ok := docIdToUserDocMapp[documentId]
+	if !ok || userDocMapp == nil {
+		return false
+	}
+
+	return userDocMapp.IsOwner()
+}
+
+func (udm *UserDocumentsManger) CheckPermissionForUser(userId uint32, docId uint32, permission user_document_mapping.DocumentAccessType) bool {
+	docIdToUserDocMapp, ok := udm.userIdToDocuments[userId]
+	if !ok {
+		return false
+	}
+	if docIdToUserDocMapp[docId] == nil {
+		return false
+	}
+	return docIdToUserDocMapp[docId].CheckPermission(permission)
+}
+
+func (udm *UserDocumentsManger) GiveUserAccess(userId, docId uint32, permission user_document_mapping.DocumentAccessType) {
+	docIdToUserDocMapp, ok := udm.userIdToDocuments[userId]
+	if !ok {
+		return
+	}
+	docIdToUserDocMapp[docId].AddPermission(permission)
+}
+
+func (udm *UserDocumentsManger) RemoveUserAccess(userId uint32, docId uint32, permission user_document_mapping.DocumentAccessType) {
+	docIdToUserDocMapp, ok := udm.userIdToDocuments[userId]
+	if !ok {
+		return
+	}
+	docIdToUserDocMapp[docId].RemovePermission(permission)
 }

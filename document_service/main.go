@@ -1,7 +1,7 @@
 package main
 
 import (
-	"document_service/domain/document_access_manager"
+	// "document_service/domain/document_access_manager"
 	"document_service/domain/user"
 	user_documents_manager "document_service/domain/user_documents"
 	document_service "document_service/service"
@@ -10,10 +10,13 @@ import (
 
 func main() {
 
-	docAccessManger := document_access_manager.NewDocumentAccessManager()
+	// docAccessManger := document_access_manager.NewDocumentAccessManager()
 	userDocManger := user_documents_manager.NewUserDocumentManager()
 
-	docService := document_service.NewDocumentService(docAccessManger, userDocManger)
+	docService := document_service.NewDocumentService(
+		// docAccessManger, 
+		userDocManger,
+	)
 
 	user1 := user.NewUser(1, "roshan")
 	user2 := user.NewUser(2, "rohan")
