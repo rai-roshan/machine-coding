@@ -41,6 +41,7 @@ func (dsi *DataSetIndex) Search(keyword string) []*IndexDocMetaData {
 			continue
 		}
 		for _, docMeta := range docs {
+			docMeta.SearchFrequency++
 			docIdToFreq[docMeta.DocId]++
 			docIdToDocMeta[docMeta.DocId] = docMeta
 		}

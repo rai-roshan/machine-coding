@@ -5,13 +5,13 @@ import (
 	"serach_service/domain/dataset"
 	"serach_service/domain/dataset_index"
 	"serach_service/domain/document"
-	"sort"
+	order_strategy "serach_service/stratergy"
 )
 
 type SearchService interface {
 	CreateDataSet(datasetId uint32) *dataset.DataSet
 	CreateDocumentInDataset(dataset *dataset.DataSet, docId uint32, content string) *document.Document
-	Search(keyword string)
+	Search(keyword string, orderAlgo order_strategy.OrderStratergy)
 }
 
 type searchService struct {
@@ -46,12 +46,12 @@ func (ss *searchService) CreateDocumentInDataset(dataset *dataset.DataSet, docId
 	return doc
 }
 
-func (ss *searchService) Search(keyword string) {
+func (ss *searchService) Search(keyword string, orderAlgo order_strategy.OrderStratergy) {
 	// result := make(map[uint32][]uint32)
 	for datasetId, datasetIdx := range ss.dataSetIndexTable {
 		resultMetaData := datasetIdx.Search(keyword)
 
-		resultMetaData = OrderByFreq(resultMetaData)
+		resultMetaData = orderAlgo.Order(resultMetaData)
 
 		if len(resultMetaData) > 0 {
 			fmt.Println("dataset id : ", datasetId)
@@ -62,9 +62,9 @@ func (ss *searchService) Search(keyword string) {
 	}
 }
 
-func OrderByFreq(result []*dataset_index.IndexDocMetaData) []*dataset_index.IndexDocMetaData {
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].TokenFrequence > result[j].TokenFrequence
-	})
-	return result
-}
+// func OrderByFreq(result []*dataset_index.IndexDocMetaData) []*dataset_index.IndexDocMetaData {
+// 	sort.Slice(result, func(i, j int) bool {
+// 		return result[i].TokenFrequence > result[j].TokenFrequence
+// 	})
+// 	return result
+// }
