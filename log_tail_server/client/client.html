@@ -1,0 +1,21 @@
+<htmpl>
+    <head>
+
+    </head>
+    <body>
+        <h1>Web Socket Client</h1>
+        <script>
+            const webSocket = new WebSocket("http://localhost:8080/socket/logs");
+            webSocket.onopen = (event) => {
+                console.log("connection made");
+            };
+
+            webSocket.onmessage = (event) => {
+                console.log(event.data);
+            }
+            socket.onerror = (error) => {
+                console.error("WebSocket error:", error);
+            };
+        </script>
+    </body>
+</htmpl>
