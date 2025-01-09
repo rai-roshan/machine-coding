@@ -3,13 +3,20 @@ package main
 import (
 	"fmt"
 	"io"
+	"log_tail_server/domain/file_system"
+	"log_tail_server/domain/file_watcher"
+	"log_tail_server/domain/log_queue"
+	log_service "log_tail_server/service"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 
 	"bufio"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/gorilla/websocket"
+	// "sync"
 )
 
 const (
@@ -17,6 +24,45 @@ const (
 	one_kb   int    = int(1000)
 	one_mb   int    = 1000 * one_kb
 )
+
+// func fileEventListener() {
+
+// }
+
+func fileWatcher(watcher *fsnotify.Watcher) error {
+
+	// Start listening for events.
+	// var wg sync.WaitGroup
+	// wg.Add(1)
+    go func() {
+        for {
+            select {
+            case event, ok := <-watcher.Events:
+                if !ok {
+                    return
+                }
+                fmt.Println("file event : ", event)
+                if event.Has(fsnotify.Write) {
+                    fmt.Println("modified file:", event.Name)
+					event.String()
+                }
+            case err, ok := <-watcher.Errors:
+                if !ok {
+                    return
+                }
+                fmt.Println("error:", err)
+            }
+        }
+    }()
+	
+	err := watcher.Add(filePath)
+	if err != nil {
+		return err
+	}
+
+	// wg.Wait()
+	return nil
+}
 
 func getLatest10Lines() ([]string, error) {
 	// open file
@@ -122,11 +168,34 @@ func main() {
 	var socketHandler SocketHandler
 	http.Handle("/socket/logs", socketHandler)
 
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		fmt.Println("error : ", err)
+	}
+	defer watcher.Close()
+
 	webSocketConnections = make(map[*websocket.Conn]bool)
 
+	err = fileWatcher(watcher)
+	if err != nil {
+		fmt.Println("error : ", err)
+	}
 	fmt.Println("listening at 8080")
-	err := http.ListenAndServe(":8080", socketHandler)
+	err = http.ListenAndServe(":8080", socketHandler)
 	if err != nil {
 		fmt.Println("err : ", err)
 	}
+
+
+	logQueue := log_queue.NewLogQueue()
+	fileSystem := file_system.NewFileSystem(filePath)
+	
+	logService := log_service.NewLogService(logQueue, fileSystem)
+	
+	fileWatcher := file_watcher.NewFileWatcher(filePath)
+	
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go fileWatcher.ListenWriteEvent( logService.PublishLogsOnWriteEvent )
+	wg.Wait()
 }
