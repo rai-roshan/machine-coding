@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
 type Node struct {
 	key   string
@@ -10,7 +13,6 @@ type Node struct {
 }
 
 type Dequeue interface {
-	// PushFront()
 	PushBack(key string, value uint32) *Node
 	PopFromFront()
 	MoveToBack(node *Node)
@@ -33,9 +35,6 @@ func NewDequeue() Dequeue {
 	}
 }
 
-// func (dq *DequeueImp) PushFront() {
-
-// }
 func (dq *DequeueImp) PushBack(key string, value uint32) *Node {
 	newNode := &Node{
 		key:  key,
@@ -75,8 +74,6 @@ func (dq *DequeueImp) MoveToBack(node *Node) {
 		nodeRight.Left = nodeLeft
 	}
 
-	// fmt.Println("Move to back : front : ", dq.Front)
-	// fmt.Println("Move to back : node : ", node )
 	if node == dq.Front {
 		dq.Front = nodeRight
 	}
@@ -107,6 +104,7 @@ type LRUImp struct {
 	size         uint32
 	keyToNodeMap map[string]*Node
 	queue        Dequeue
+	lock         sync.RWMutex
 }
 
 func NewLRU(size uint32) LRU {
@@ -118,6 +116,11 @@ func NewLRU(size uint32) LRU {
 }
 
 func (lru *LRUImp) Insert(key string, value uint32) {
+	lru.lock.Lock()
+	defer func() {
+		lru.lock.Unlock()
+	}()
+
 	// 1. check if the key already present
 	node, ok := lru.keyToNodeMap[key]
 	if ok {
@@ -125,9 +128,9 @@ func (lru *LRUImp) Insert(key string, value uint32) {
 		lru.queue.MoveToBack(node)
 	} else {
 		newNode := lru.queue.PushBack(key, value)
-		lru.keyToNodeMap[ key ] = newNode
+		lru.keyToNodeMap[key] = newNode
 	}
-	
+
 	fmt.Println("font : ", *lru.queue.GetFront())
 
 	// 2. check size of queue
@@ -140,13 +143,19 @@ func (lru *LRUImp) Insert(key string, value uint32) {
 }
 
 func (lru *LRUImp) Get(key string) int {
+
+	lru.lock.RLock()
 	node, ok := lru.keyToNodeMap[key]
 	if !ok {
 		fmt.Printf("key : %s || value : %d\n", key, -1)
+		lru.lock.RUnlock()
 		return -1
 	}
+	lru.lock.RUnlock()
 
+	lru.lock.Lock()
 	lru.queue.MoveToBack(node)
+	lru.lock.Unlock()
 
 	fmt.Printf("key : %s || value : %d\n", key, node.data)
 	return int(node.data)
